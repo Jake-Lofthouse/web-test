@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Browser Monitor</title>
+
+<style>
+body{
+    font-family:Arial,sans-serif;
+    background:#181818;
+    color:white;
+    margin:20px;
+}
+
+h1{
+    margin-top:0;
+}
+
+table{
+    width:100%;
+    border-collapse:collapse;
+    margin-bottom:25px;
+}
+
+th,td{
+    border:1px solid #444;
+    padding:8px;
+}
+
+th{
+    width:280px;
+    background:#333;
+}
+
+button{
+    padding:10px 20px;
+    margin:5px;
+    cursor:pointer;
+}
+
+#history{
+    background:#222;
+    padding:15px;
+    height:350px;
+    overflow-y:auto;
+    border:1px solid #444;
+    white-space:pre-wrap;
+    font-family:Consolas,monospace;
+}
+
+.status{
+    padding:10px;
+    font-weight:bold;
+    margin-bottom:15px;
+}
+
+.online{
+    background:#1c7c1c;
+}
+
+.offline{
+    background:#b71c1c;
+}
+</style>
+</head>
+<body>
+    
+<h2>History</h2>
+
+<div id="history"></div>
+
+
+<h1>Browser Monitor</h1>
+
+<div id="status" class="status"></div>
+
+<table id="info"></table>
+
+<button onclick="clearHistory()">Clear History</button>
+
+<h2>History</h2>
+
+<div id="history"></div>
+
+<script>
+
+const table=document.getElementById("info");
+const historyBox=document.getElementById("history");
+
+let hiddenStart=null;
+
+function now(){
+    return new Date().toLocaleString();
+}
+
+function log(event){
+
+    let logs=JSON.parse(localStorage.getItem("logs")||"[]");
+
+    logs.unshift({
+        time:now(),
+        event:event
+    });
+
+    if(logs.length>500)
+        logs=logs.slice(0,500);
+
+    localStorage.setItem("logs",JSON.stringify(logs));
+
+    displayHistory();
+
+}
+
+function displayHistory(){
+
+    let logs=JSON.parse(localStorage.getItem("logs")||"[]");
+
+    historyBox.innerHTML="";
+
+    logs.forEach(l=>{
+
+        historyBox.innerHTML+=
+        `[${l.time}] ${l.event}\n`;
+
+    });
+
+}
+
+function clearHistory(){
+
+    localStorage.removeItem("logs");
+
+    displayHistory();
+
+}
+
+function row(name,value){
+
+    let tr=document.createElement("tr");
+
+    tr.innerHTML=
+    `<th>${name}</th><td>${value}</td>`;
+
+    table.appendChild(tr);
+
+}
+
+function update(){
+
+    table.innerHTML="";
+
+    document.getElementById("status").className=
+        navigator.onLine?"status online":"status offline";
+
+    document.getElementById("status").innerHTML=
+        navigator.onLine?
+        "ONLINE":
+        "OFFLINE";
+
+    row("Current Time",now());
+
+    row("URL",location.href);
+
+    row("Title",document.title);
+
+    row("Visible",!document.hidden);
+
+    row("Visibility State",document.visibilityState);
+
+    row("Focused",document.hasFocus());
+
+    row("Screen Resolution",screen.width+" × "+screen.height);
+
+    row("Available Resolution",screen.availWidth+" × "+screen.availHeight);
+
+    row("Window Size",window.innerWidth+" × "+window.innerHeight);
+
+    row("Outer Window",window.outerWidth+" × "+window.outerHeight);
+
+    row("Device Pixel Ratio",window.devicePixelRatio);
+
+    row("Orientation",screen.orientation?.type||"Unknown");
+
+    row("Fullscreen",!!document.fullscreenElement);
+
+    row("Online",navigator.onLine);
+
+    row("Language",navigator.language);
+
+    row("Timezone",Intl.DateTimeFormat().resolvedOptions().timeZone);
+
+    row("Platform",navigator.platform);
+
+    row("CPU Cores",navigator.hardwareConcurrency||"Unknown");
+
+    row("RAM (GB)",navigator.deviceMemory||"Unknown");
+
+    row("Touch Points",navigator.maxTouchPoints);
+
+    row("Cookies Enabled",navigator.cookieEnabled);
+
+    row("User Agent",navigator.userAgent);
+
+}
+
+window.addEventListener("load",()=>{
+
+    if(sessionStorage.getItem("loaded"))
+        log("🔄 Page refreshed");
+    else{
+        log("🟢 Browser/page opened");
+        sessionStorage.setItem("loaded","1");
+    }
+
+    update();
+
+});
+
+window.addEventListener("resize",()=>{
+
+    log(`📐 Window resized to ${window.innerWidth}x${window.innerHeight}`);
+
+    update();
+
+});
+
+window.addEventListener("online",()=>{
+
+    log("🟢 Internet connected");
+
+    update();
+
+});
+
+window.addEventListener("offline",()=>{
+
+    log("🔴 Internet disconnected");
+
+    update();
+
+});
+
+window.addEventListener("focus",()=>{
+
+    log("🟢 Window gained focus");
+
+    update();
+
+});
+
+window.addEventListener("blur",()=>{
+
+    log("🟡 Window lost focus");
+
+    update();
+
+});
+
+document.addEventListener("visibilitychange",()=>{
+
+    if(document.hidden){
+
+        hiddenStart=Date.now();
+
+        log("🙈 Tab hidden");
+
+    }else{
+
+        if(hiddenStart){
+
+            let seconds=Math.round((Date.now()-hiddenStart)/1000);
+
+            log(`👀 Tab visible again after ${seconds} seconds`);
+
+            hiddenStart=null;
+
+        }else{
+
+            log("👀 Tab visible");
+
+        }
+
+    }
+
+    update();
+
+});
+
+document.addEventListener("fullscreenchange",()=>{
+
+    log(
+        document.fullscreenElement?
+        "🖥 Entered fullscreen":
+        "🪟 Exited fullscreen"
+    );
+
+    update();
+
+});
+
+window.addEventListener("beforeunload",()=>{
+
+    log("❌ Browser/page closing");
+
+});
+
+if(screen.orientation){
+
+    screen.orientation.addEventListener("change",()=>{
+
+        log("📱 Screen orientation changed");
+
+        update();
+
+    });
+
+}
+
+setInterval(update,1000);
+
+displayHistory();
+
+</script>
+
+</body>
+</html>
